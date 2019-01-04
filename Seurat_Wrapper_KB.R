@@ -7,7 +7,11 @@
 #maxgenes     max number of genes a cell can have, recommend 10000
 #save_seurobj_for_qcplot T or F, save and store object for output_qcplots, plotting various QC metrics
 
-seurat_10x_autofrommat_complex <- function(mat, allgenes, delim = NULL, field = NULL, doregress, maxgenes, save_seurobj_for_qcplot){
+library(Seurat)
+library(dplyr)
+ribo <- readRDS("/Users/kevinbi/Documents/scRNASeq/ribosomal_genes_GO0005840.RDS")
+
+seurat_10x_autofrommat_complex <- function(mat, allgenes, delim = NULL, field = NULL, doregress, vars_to_regress = NULL, maxgenes, save_seurobj_for_qcplot){
   pbmc.data <- mat
   genes <- row.names(pbmc.data)
   genes <- gsub("hg19_","", genes)
@@ -22,10 +26,11 @@ seurat_10x_autofrommat_complex <- function(mat, allgenes, delim = NULL, field = 
   rp.genes <- intersect(ribo, rownames(pbmc@data))
   percent.mito <- colSums(pbmc@raw.data[mito.genes, ])/colSums(pbmc@raw.data)
   percent.rp <- colSums(pbmc@raw.data[rp.genes, ])/colSums(pbmc@raw.data)
+  log10_nUMI <- log(pbmc@meta.data$nUMI, 10)
   pbmc <- AddMetaData(object = pbmc, metadata = percent.mito, col.name = "percent.mito")
   pbmc <- AddMetaData(object = pbmc, metadata = percent.rp, col.name = "percent.rp")
+  pbmc <- AddMetaData(object = pbmc, metadata = log10_nUMI, col.name = "log10_nUMI")
   if(isTRUE(save_seurobj_for_qcplot)){
-  saveRDS(pbmc, file = "SeurObj_ForQCPlot.RDS")
     SeurObj_ForQCPlot <<- pbmc}
   VlnPlot(object = pbmc, features.plot = c("nGene", "nUMI", "percent.mito"), nCol = 3)
   pbmc <- FilterCells(object = pbmc, subset.names = c("nGene", "percent.mito"), 
@@ -36,7 +41,7 @@ seurat_10x_autofrommat_complex <- function(mat, allgenes, delim = NULL, field = 
                             x.low.cutoff = 0.0125, x.high.cutoff = 4, y.cutoff = 0.5)
   length(x = pbmc@var.genes)
   if(isTRUE(doregress)){
-    pbmc <- ScaleData(object = pbmc, vars.to.regress = c("nUMI", "percent.mito"))} 
+    pbmc <- ScaleData(object = pbmc, vars.to.regress = vars_to_regress, model.use = 'negbinom')} 
   else {pbmc <- ScaleData(object = pbmc)}
   if(isTRUE(allgenes)){
     pbmc <- RunPCA(object = pbmc, pc.genes = row.names(as.matrix(pbmc@data)), do.print = TRUE, pcs.print = 1:5, 
@@ -46,6 +51,19 @@ seurat_10x_autofrommat_complex <- function(mat, allgenes, delim = NULL, field = 
                    genes.print = 5, pcs.compute = 60)}
   return(pbmc)
 }
+
+
+#Return percentage of cells in a given batch assigned to each cluster
+batchcontribution_tocluster <- function(object){
+  seur <- object
+  dat <- table(seur@ident, seur@meta.data$orig.ident)
+  numbatches <- length(colnames(dat))
+  colsums <- colSums(dat)
+  results <- sweep(dat, 2, colsums, '/')
+  return(results)
+}
+
+
 
 ##calculate percent expression of a single gene across dataset
 #vec    expression vector
