@@ -1,0 +1,93 @@
+task count {
+    String sample
+    Array[File] fastqs
+    File reference_tarball
+    String reference_path
+    Int? expected_cells
+
+    command <<<
+        # log resource usage for debugging purposes
+        function runtimeInfo() {
+            echo [$(date)]
+            echo \* CPU usage: $(top -bn 2 -d 0.01 | grep '^%Cpu' | tail -n 1)%
+            echo \* Memory usage: $(free -m | grep Mem | awk '{ OFMT="%.0f"; print ($3/$2)*100; }')%
+            echo \* Disk usage: $(df | grep cromwell_root | awk '{ print $5 }')
+        }
+        while true;
+            do runtimeInfo >> resource_usage.log;
+            sleep 90;
+        done &
+
+        ##### MAIN COMMANDS BELOW #####
+
+        set -x
+        # set bash parameters to fail fast
+        set -eu -o pipefail
+
+        # move fastqs into a directory
+        mkdir fastqs
+        mv -t fastqs ${sep=" " fastqs}
+
+        # untar reference files
+        tar -zxvf ${reference_tarball}
+
+        # need to generate reference directory
+        cellranger count \
+            --id=${sample} \
+            --transcriptome=${reference_path} \
+            --fastqs=fastqs \
+            --sample=${sample} \
+            ${"--expect-cells=" + expected_cells}
+
+        # list files
+        echo [$(date)] 'Listing files...'
+        find .
+
+        # compress .mtx matrices
+        gzip ${sample}/outs/*matrices/*/*.mtx
+
+        # pack up secondary analyses output
+        tar -zvcf analysis.tar.gz ${sample}/outs/analysis
+    >>>
+
+    output {
+        File summary_html = sample + "/outs/web_summary.html"
+        File summary_csv = sample + "/outs/metrics_summary.csv"
+        File bam = sample + "/outs/possorted_genome_bam.bam"
+        File bai = sample + "/outs/possorted_genome_bam.bam.bai"
+        Array[File] filtered_gene_bc_mex = glob(sample + "/outs/filtered_gene_bc_matrices/*/*")
+        File filtered_gene_bc_h5 = sample + "/outs/filtered_gene_bc_matrices_h5.h5"
+        Array[File] unfiltered_gene_bc_mex = glob(sample + "/outs/raw_gene_bc_matrices/*/*")
+        File unfiltered_gene_bc_h5 = sample + "/outs/raw_gene_bc_matrices_h5.h5"
+        File analysis = "analysis.tar.gz"
+        File molecule_info = sample + "/outs/molecule_info.h5"
+        File loupe = sample + "/outs/cloupe.cloupe"
+        File resource_usage = "resource_usage.log"
+        File pipestance_info = sample + "/" + sample + ".mri.tgz"
+    }
+
+    runtime {
+        disks: "local-disk 350 LOCAL"
+        cpu: 32
+        memory: "208 GB"
+        docker: "gcr.io/vanallen-gcp-dfci/scrna/cellranger:3.0.1"
+        preemptible: 2
+    }
+}
+
+workflow cellranger_count {
+    String sample
+    Array[File] fastqs
+    File reference_tarball
+    String reference_path
+    Int? expected_cells
+
+    call count {
+        input:
+            sample=sample,
+            fastqs=fastqs,
+            reference_tarball=reference_tarball,
+            reference_path=reference_path,
+            expected_cells=expected_cells
+    }
+}
