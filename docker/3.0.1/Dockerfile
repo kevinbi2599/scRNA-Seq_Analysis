@@ -11,4 +11,6 @@ RUN md5sum -c cellranger.md5sum
 
 RUN tar --absolute-names -xzvf cellranger.tar.gz && mv cellranger-3.0.1 cellranger
 
+RUN yum -y install which
+
 ENV PATH="/opt/cellranger:${PATH}"

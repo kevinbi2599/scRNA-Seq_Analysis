@@ -1,6 +1,6 @@
 task aggr {
-    File csv
     String sample
+    File csv
     String normalize
 
     command <<<
@@ -42,8 +42,6 @@ task aggr {
     output {
         File summary_html = sample + "/outs/web_summary.html"
         File summary_csv = sample + "/outs/metrics_summary.csv"
-        File bam = sample + "/outs/possorted_genome_bam.bam"
-        File bai = sample + "/outs/possorted_genome_bam.bam.bai"
         Array[File] filtered_gene_bc_mex = glob(sample + "/outs/filtered_gene_bc_matrices/*/*")
         File filtered_gene_bc_h5 = sample + "/outs/filtered_gene_bc_matrices_h5.h5"
         Array[File] unfiltered_gene_bc_mex = glob(sample + "/outs/raw_gene_bc_matrices/*/*")
@@ -51,6 +49,8 @@ task aggr {
         File analysis = "analysis.tar.gz"
         File molecule_info = sample + "/outs/molecule_info.h5"
         File loupe = sample + "/outs/cloupe.cloupe"
+        File input_csv = sample + "/outs/aggregation.csv"
+        File cell_containing_partitions= sample + "/outs/cell_barcodes.csv"
         File resource_usage = "resource_usage.log"
         File pipestance_info = sample + "/" + sample + ".mri.tgz"
     }
@@ -69,10 +69,10 @@ workflow cellranger_aggr {
     String sample
     String normalize
 
-    call count {
+    call aggr {
         input:
-            csv=csv,
             sample=sample,
+            csv=csv,
            normalize=normalize
     }
 }
