@@ -1,7 +1,7 @@
 task aggr {
-    String sample
-    File csv
-    String normalize
+    String run_name
+    File aggr_csv
+    String normalization
 
     command <<<
         # log resource usage for debugging purposes
@@ -24,16 +24,13 @@ task aggr {
 
         # need to generate reference directory
         cellranger aggr \
-            --id=${sample} \
-            --csv=csv \
-            --normalize=${normalize}
+            --id=${run_name} \
+            --csv=${aggr_csv} \
+            --normalize=${normalization}
 
         # list files
         echo [$(date)] 'Listing files...'
         find .
-
-        # compress .mtx matrices
-        gzip ${sample}/outs/*matrices/*/*.mtx
 
         # pack up secondary analyses output
         tar -zvcf analysis.tar.gz ${sample}/outs/analysis
@@ -41,11 +38,11 @@ task aggr {
 
     output {
         File summary_html = sample + "/outs/web_summary.html"
-        File summary_csv = sample + "/outs/metrics_summary.csv"
-        Array[File] filtered_gene_bc_mex = glob(sample + "/outs/filtered_gene_bc_matrices/*/*")
-        File filtered_gene_bc_h5 = sample + "/outs/filtered_gene_bc_matrices_h5.h5"
-        Array[File] unfiltered_gene_bc_mex = glob(sample + "/outs/raw_gene_bc_matrices/*/*")
-        File unfiltered_gene_bc_h5 = sample + "/outs/raw_gene_bc_matrices_h5.h5"
+        File summary_json = sample + "/outs/summary.json"
+        Array[File] filtered_gene_bc_mex = glob(sample + "/outs/filtered_feature_bc_matrix/*")
+        File filtered_gene_bc_h5 = sample + "/outs/filtered_feature_bc_matrix.h5"
+        Array[File] unfiltered_gene_bc_mex = glob(sample + "/outs/raw_feature_bc_matrix/*")
+        File unfiltered_gene_bc_h5 = sample + "/outs/raw_feature_bc_matrix.h5"
         File analysis = "analysis.tar.gz"
         File molecule_info = sample + "/outs/molecule_info.h5"
         File loupe = sample + "/outs/cloupe.cloupe"
@@ -58,21 +55,21 @@ task aggr {
     runtime {
         disks: "local-disk 350 LOCAL"
         cpu: 32
-        memory: "208 GB"
+        memory:120 GB"
         docker: "gcr.io/vanallen-gcp-dfci/scrna/cellranger:3.0.1"
         preemptible: 2
     }
 }
 
 workflow cellranger_aggr {
-     File csv
-    String sample
-    String normalize
+    String run_name
+    File aggr_csv
+    String normalization
 
     call aggr {
         input:
-            sample=sample,
-            csv=csv,
-           normalize=normalize
+            run_name=run_name,
+            aggr_csv=aggr_csv,
+           normalization=normalization
     }
 }
